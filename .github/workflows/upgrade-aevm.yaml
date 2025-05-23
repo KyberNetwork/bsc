@@ -1,0 +1,36 @@
+name: Upgrade aevm library
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'KyberNetwork/aevm tag'
+
+env:
+  GOPRIVATE: github.com/KyberNetwork
+
+jobs:
+  upgrade-aevm:
+    name: Upgrade aevm library
+    runs-on: self-hosted
+    steps:
+      - name: Add git config for go private module
+        env:
+          GH_PAT: ${{ secrets.GH_PAT }}
+        run: git config --global url."https://${GH_PAT}:x-oauth-basic@github.com/".insteadOf https://github.com/
+      - uses: actions/setup-go@v3
+        with:
+          go-version: "1.24.2"
+      - uses: actions/checkout@v3
+      - name: Upgrade KyberNetwork/aevm
+        run: |
+          go get github.com/KyberNetwork/aevm@${{ inputs.tag }}
+          go mod tidy
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v5
+        with:
+          token: ${{ secrets.GH_PAT }}
+          title: Upgrade KyberNetwork/aevm to ${{ inputs.tag }}
+          commit-message: upgraded KyberNetwork/aevm to ${{ inputs.tag }}
+          branch: upgrade-aevm-to-${{ inputs.tag }}
+          delete-branch: true

@@ -72,9 +72,10 @@ type prestateTracer struct {
 }
 
 type prestateTracerConfig struct {
-	DiffMode       bool `json:"diffMode"`       // If true, this tracer will return state modifications
-	DisableCode    bool `json:"disableCode"`    // If true, this tracer will not return the contract code
-	DisableStorage bool `json:"disableStorage"` // If true, this tracer will not return the contract storage
+	DiffMode             bool `json:"diffMode"`             // If true, this tracer will return state modifications
+	DisableCode          bool `json:"disableCode"`          // If true, this tracer will not return the contract code
+	DisableStorage       bool `json:"disableStorage"`       // If true, this tracer will not return the contract storage
+	DiffModeFullPreState bool `json:"diffModeFullPreState"` // If true and DiffMode is true, this tracer will return state modifications and full preState.
 }
 
 func newPrestateTracer(ctx *tracers.Context, cfg json.RawMessage, chainConfig *params.ChainConfig) (*tracers.Tracer, error) {
@@ -251,7 +252,7 @@ func (t *prestateTracer) processDiffState() {
 					delete(t.pre[addr].Storage, key)
 				} else {
 					modified = true
-					if newVal != (common.Hash{}) {
+					if t.config.DiffModeFullPreState || newVal != (common.Hash{}) {
 						postAccount.Storage[key] = newVal
 					}
 				}
@@ -260,7 +261,7 @@ func (t *prestateTracer) processDiffState() {
 
 		if modified {
 			t.post[addr] = postAccount
-		} else {
+		} else if !t.config.DiffModeFullPreState {
 			// if state is not modified, then no need to include into the pre state
 			delete(t.pre, addr)
 		}

@@ -1,0 +1,42 @@
+name: Unit tests
+
+on:
+  push:
+    branches: [ master, aevm ]
+  pull_request:
+    branches: [ master, aevm ]
+  workflow_dispatch:
+
+env:
+  GOPRIVATE: github.com/KyberNetwork
+
+jobs:
+  test:
+    runs-on: self-hosted
+    steps:
+      - name: Add git config for go private module
+        env:
+          GH_PAT: ${{ secrets.GH_PAT }}
+        run: git config --global url."https://${GH_PAT}:x-oauth-basic@github.com/".insteadOf https://github.com/
+
+      - name: Install clang-14
+        run: |
+          sudo su -c "echo 'deb http://apt.llvm.org/focal/ llvm-toolchain-focal-14 main' >> /etc/apt/sources.list"
+          sudo su -c "echo 'deb-src http://apt.llvm.org/focal/ llvm-toolchain-focal-14 main' >> /etc/apt/sources.list"
+          curl -s https://apt.llvm.org/llvm-snapshot.gpg.key | sudo apt-key add -
+          sudo apt update
+          sudo apt install -y --no-install-recommends make clang-14
+
+      - name: Set CC environment variable
+        run: echo "CC=$(which clang-14)" >> $GITHUB_ENV
+
+      - uses: actions/checkout@v2
+      - name: Set up Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: "1.24.2"
+      - name: Run tests
+        run: go run build/ci.go test -dlgo
+        env:
+          AEVM_LISTENER_ADDRESS: ":0"
+          CGO_LDFLAGS_ALLOW: ".*"

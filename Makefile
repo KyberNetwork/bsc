@@ -13,7 +13,7 @@ GIT_COMMIT_DATE=$(shell git log -n1 --pretty='format:%cd' --date=format:'%Y%m%d'
 
 #? geth: Build geth.
 geth:
-	$(GORUN) build/ci.go install ./cmd/geth
+	CGO_LDFALGS_ALLOW=".*" $(GORUN) build/ci.go install -cc $(CC) ./cmd/geth
 	@echo "Done building."
 	@echo "Run \"$(GOBIN)/geth\" to launch geth."
 
@@ -24,11 +24,11 @@ faucet:
 
 #? all: Build all packages and executables.
 all:
-	$(GORUN) build/ci.go install
+	$(GORUN) build/ci.go install -cc $(CC)
 
 #? test: Run the tests.
 test: all
-	$(GORUN) build/ci.go test -timeout 1h
+	CC=$(CC) $(GORUN) build/ci.go test -cc $(CC) -timeout 1h
 
 #? truffle-test: Run the integration test.
 truffle-test:
@@ -43,7 +43,7 @@ truffle-test:
 
 #? lint: Run certain pre-selected linters.
 lint: ## Run linters.
-	$(GORUN) build/ci.go lint
+	$(GORUN) build/ci.go lint -cc $(CC)
 
 #? fmt: Ensure consistent code formatting.
 fmt:

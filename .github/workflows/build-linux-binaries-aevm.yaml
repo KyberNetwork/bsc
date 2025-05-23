@@ -1,0 +1,88 @@
+name: build-linux-binaries-aevm
+
+on:
+  push:
+    tags:
+      - "v*-aevm*"
+
+jobs:
+  build-x86_64-binaries:
+    runs-on: self-hosted
+    permissions:
+      contents: write
+
+    steps:
+      - name: Install clang-14
+        run: |
+          . /etc/os-release
+          sudo su -c "echo \"deb http://apt.llvm.org/${VERSION_CODENAME}/ llvm-toolchain-${VERSION_CODENAME}-14 main\" >> /etc/apt/sources.list"
+          sudo su -c "echo \"deb-src http://apt.llvm.org/${VERSION_CODENAME}/ llvm-toolchain-${VERSION_CODENAME}-14 main\" >> /etc/apt/sources.list"
+          curl https://apt.llvm.org/llvm-snapshot.gpg.key | sudo apt-key add -
+          sudo apt update
+          sudo apt install -y --no-install-recommends make clang-14
+
+      - name: Set CC environment variable
+        run: echo "CC=$(which clang-14)" >> $GITHUB_ENV
+
+      - name: Set up Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: "1.24.2"
+
+      - uses: actions/checkout@v3
+        with:
+          path: src
+
+      - id: go-cache-paths
+        run: |
+          echo "go-build=$(go env GOCACHE)" >> $GITHUB_OUTPUT
+          echo "go-mod=$(go env GOMODCACHE)" >> $GITHUB_OUTPUT
+
+      # Cache go build cache, used to speedup go test
+      - name: Go Build Cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.go-cache-paths.outputs.go-build }}
+          key: ${{ runner.os }}-go-build-${{ hashFiles('src/**/go.sum') }}
+
+      # Cache go mod cache, used to speedup builds
+      - name: Go Mod Cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.go-cache-paths.outputs.go-mod }}
+          key: ${{ runner.os }}-go-mod-${{ hashFiles('src/**/go.sum') }}
+
+      - name: Build go-ethereum
+        env:
+          GH_PAT: ${{ secrets.GH_PAT }}
+          CGO_LDFLAGS_ALLOW: ".*"
+        run: |
+          export GOPRIVATE=github.com/KyberNetwork
+          git config --global url."https://${GH_PAT}:x-oauth-basic@github.com/".insteadOf https://github.com/
+          pushd src
+          make geth
+          popd
+
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: Release ${{ github.ref }}
+          draft: false
+          prerelease: false
+
+      - name: Upload Release Asset
+        id: upload-release-asset
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          # This pulls from the CREATE RELEASE step above, referencing it's ID to get its outputs object, which include a `upload_url`.
+          # See this blog post for more info: https://jasonet.co/posts/new-features-of-github-actions/#passing-data-to-future-steps
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./src/build/bin/geth
+          asset_name: geth-linux-amd64-${{ github.ref_name }}
+          asset_content_type: application/octet-stream

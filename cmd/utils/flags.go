@@ -24,6 +24,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/ethereum/go-ethereum/eth/aevm"
 	"math"
 	"math/big"
 	"net"
@@ -2313,6 +2314,12 @@ func RegisterEthService(stack *node.Node, cfg *ethconfig.Config) (ethapi.Backend
 	if err != nil {
 		Fatalf("Failed to register the Ethereum service: %v", err)
 	}
+	// New and inject AEVMServer to Ethereum backend
+	aevmServer, err := aevm.NewAEVMServer(backend, backend.APIBackend)
+	if err != nil {
+		Fatalf("Failed to NewAEVMServer: %v", err)
+	}
+	backend.SetAEVMServer(aevmServer)
 	stack.RegisterAPIs(tracers.APIs(backend.APIBackend))
 	return backend.APIBackend, backend
 }

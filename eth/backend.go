@@ -132,6 +132,8 @@ type Ethereum struct {
 
 	votePool     *vote.VotePool
 	stopReportCh chan struct{}
+
+	aevmServer node.Lifecycle
 }
 
 // New creates a new Ethereum object (including the initialisation of the common Ethereum object),
@@ -616,6 +618,13 @@ func (s *Ethereum) Start() error {
 	s.handler.Start(s.p2pServer.MaxPeers, s.p2pServer.MaxPeersPerIP)
 
 	go s.reportRecentBlocksLoop()
+	// Start AEVM server
+	if s.aevmServer != nil {
+		if err := s.aevmServer.Start(); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
@@ -692,7 +701,9 @@ func (s *Ethereum) Stop() error {
 
 	s.chainDb.Close()
 	s.eventMux.Stop()
-
+	if s.aevmServer != nil {
+		s.aevmServer.Stop()
+	}
 	// stop report loop
 	s.stopReportCh <- struct{}{}
 	return nil
@@ -769,4 +780,8 @@ func (s *Ethereum) reportRecentBlocksLoop() {
 			return
 		}
 	}
+}
+
+func (s *Ethereum) SetAEVMServer(aevmServer node.Lifecycle) {
+	s.aevmServer = aevmServer
 }
